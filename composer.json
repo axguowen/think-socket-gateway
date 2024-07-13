@@ -1,0 +1,36 @@
+{
+    "name": "axguowen/think-socket-gateway",
+    "description": "Websocket Gateway Service For ThinkPHP",
+    "keywords": [
+        "socket",
+        "gateway",
+        "thinkphp"
+    ],
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "axguowen",
+            "email": "axguowen@qq.com"
+        }
+    ],
+    "require": {
+        "workerman/gateway-worker": ">=3.0.0",
+        "topthink/framework": "^6.1 || ^8.0",
+        "ext-fileinfo": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "think\\socket\\gateway\\": "src"
+        }
+    },
+    "extra": {
+        "think":{
+            "services":[
+                "think\\socket\\gateway\\Service"
+            ],
+            "config": {
+                "socketgateway": "src/config.php"
+            }
+        }
+    }
+}
