@@ -14,7 +14,7 @@ namespace think\socket\gateway;
 use think\App;
 use think\console\Input;
 use think\console\Output;
-use Workerman\Worker as Workerman;
+use Workerman\Worker;
 use GatewayWorker\Gateway as GatewayWorker;
 
 class Gateway
@@ -164,7 +164,7 @@ class Gateway
         }
         // 如果指定以守护进程方式运行
         if ($this->input->hasOption('daemon') || true === $this->options['daemonize']) {
-            Workerman::$daemonize = true;
+            Worker::$daemonize = true;
         }
 	}
 
@@ -176,7 +176,7 @@ class Gateway
 	public function start()
 	{
         // 启动
-		Workerman::runAll();
+		Worker::runAll();
 	}
 
     /**
@@ -186,6 +186,6 @@ class Gateway
      */
     public function stop()
     {
-        Workerman::stopAll();
+        Worker::stopAll();
     }
 }
