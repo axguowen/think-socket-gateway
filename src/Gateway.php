@@ -121,7 +121,7 @@ class Gateway
 	protected function init()
 	{
         // 实例化gateway进程
-        $gateway = new Gateway($this->options['protocol'] . $this->options['listen'] . ':' . $this->options['port']);
+        $gateway = new GatewayWorker($this->options['protocol'] . $this->options['listen'] . ':' . $this->options['port']);
         // gateway名称，status方便查看
         $gateway->name = $this->options['name'];
         if(empty($gateway->name)){

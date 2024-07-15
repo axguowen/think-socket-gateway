@@ -80,13 +80,13 @@ class Command extends Base
         }
 
         // 实例化
-        $worker = $this->app->make(Gateway::class, [$input, $output]);
+        $gateway = $this->app->make(Gateway::class, [$input, $output]);
 
         if (DIRECTORY_SEPARATOR == '\\') {
             $output->writeln('You can exit with <info>`CTRL-C`</info>');
         }
 
         // 启动
-		$worker->start();
+		$gateway->start();
     }
 }
