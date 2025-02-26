@@ -79,21 +79,14 @@ class Command extends Base
             $output->writeln('Starting socket gateway service...');
         }
 
-        // 读取配置
-        $options = $this->app->config->get('socketgateway', []);
-        // 如果是守护进程模式
-        if ($input->hasOption('daemon')) {
-            $options['daemonize'] = true;
-        }
-
         // 实例化
-        $gateway = $this->app->make(Gateway::class, [$options]);
+        $gateway = $this->app->make(Gateway::class);
 
         if (DIRECTORY_SEPARATOR == '\\') {
             $output->writeln('You can exit with <info>`CTRL-C`</info>');
         }
 
         // 启动
-		$gateway->start();
+		$gateway->start($input, $output);
     }
 }

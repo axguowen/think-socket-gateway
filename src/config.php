@@ -50,14 +50,12 @@ return [
     // 心跳数据，当需要服务端定时给客户端发送心跳数据时，$gateway->pingData设置为服务端要发送的心跳请求数据。
     // 心跳数据是任意的，只要客户端能识别即可，客户端收到心跳数据可以忽略不做任何处理。
     'ping_data' => 'ping',
-    // Gateway进程启动后的回调函数
-    'on_worker_start' => null,
-    // Gateway进程关闭的回调函数
-    'on_worker_stop' => null,
-    // 当有客户端连接上来时触发的回调函数
-    'on_connect' => null,
-    // 当有客户端连接关闭时触发的回调函数
-    'on_close' => null,
     // 是否以守护进程启动
     'daemonize' => false,
+    // 内容输出文件路径
+    'stdout_file' => '',
+    // pid文件路径
+    'pid_file' => '',
+    // 日志文件路径
+    'log_file' => '',
 ];

@@ -11,7 +11,9 @@
 
 namespace think\socket\gateway;
 
-use think\facade\App;
+use think\App;
+use think\console\Output;
+use think\console\Input;
 use Workerman\Worker;
 use GatewayWorker\Gateway as GatewayWorker;
 
@@ -62,28 +64,28 @@ class Gateway
         // 心跳数据，当需要服务端定时给客户端发送心跳数据时，$gateway->pingData设置为服务端要发送的心跳请求数据。
         // 心跳数据是任意的，只要客户端能识别即可，客户端收到心跳数据可以忽略不做任何处理。
         'ping_data' => 'ping',
-        // Gateway进程启动后的回调函数
-        'on_worker_start' => null,
-        // Gateway进程关闭的回调函数
-        'on_worker_stop' => null,
-        // 当有客户端连接上来时触发的回调函数
-        'on_connect' => null,
-        // 当有客户端连接关闭时触发的回调函数
-        'on_close' => null,
         // 是否以守护进程启动
         'daemonize' => false,
+        // 内容输出文件路径
+        'stdout_file' => '',
+        // pid文件路径
+        'pid_file' => '',
+        // 日志文件路径
+        'log_file' => '',
 	];
 
     /**
      * 架构函数
      * @access public
-	 * @param array $options
+     * @param App $app 容器实例
      * @return void
      */
-    public function __construct(array $options = [])
+    public function __construct(App $app)
     {
+        // 记录容器实例
+        $this->app = $app;
         // 合并配置
-		$this->options = array_merge($this->options, $options);
+		$this->options = array_merge($this->options, $this->app->config->get('socketgateway', []));
         // 初始化
 		$this->init();
     }
@@ -95,15 +97,111 @@ class Gateway
      */
 	protected function init()
 	{
+        // 如果监听协议为空
+        if(empty($this->options['protocol'])){
+            // 抛出异常
+            throw new \Exception('protocol can not be empty');
+        }
+        // 如果监听地址为空
+        if(empty($this->options['listen'])){
+            // 抛出异常
+            throw new \Exception('listen can not be empty');
+        }
+        // 如果端口不合法
+        if(!is_numeric($this->options['port']) || $this->options['port'] < 0 || $this->options['port'] > 65535){
+            // 抛出异常
+            throw new \Exception('port must be a number between 0 and 65535');
+        }
+	}
+
+    /**
+     * 启动
+     * @access public
+     * @param Input $input 输入
+     * @param Output $output 输出
+	 * @return void
+     */
+	public function start(Input $input, Output $output)
+	{
+        // 不是控制台模式
+        if (!$this->app->runningInConsole()) {
+            // 抛出异常
+            throw new \Exception('only supports running in cli mode');
+        }
+
+        // 如果是守护进程模式
+        if ($input->hasOption('daemon')) {
+            // 修改配置为守护进程模式
+            $this->options['daemonize'] = true;
+        }
+
+        // 进程名称为空
+		if(empty($this->options['name'])){
+            $this->options['name'] = 'think-socket-gateway';
+        }
+        // 构造新的运行时目录
+		$runtimePath = $this->app->getRuntimePath() . $this->options['name'] . DIRECTORY_SEPARATOR;
+        // 设置runtime路径
+        $this->app->setRuntimePath($runtimePath);
+
+        // 主进程reload
+		Worker::$onMasterReload = function () {
+			// 清理opcache
+            if (function_exists('opcache_get_status')) {
+                if ($status = opcache_get_status()) {
+                    if (isset($status['scripts']) && $scripts = $status['scripts']) {
+                        foreach (array_keys($scripts) as $file) {
+                            opcache_invalidate($file, true);
+                        }
+                    }
+                }
+            }
+        };
+
+        // 内容输出文件路径
+		if(!empty($this->options['stdout_file'])){
+			// 目录不存在则自动创建
+			$stdout_dir = dirname($this->options['stdout_file']);
+			if (!is_dir($stdout_dir)){
+				mkdir($stdout_dir, 0755, true);
+			}
+			// 指定stdout文件路径
+			Worker::$stdoutFile = $this->options['stdout_file'];
+		}
+		// pid文件路径
+		if(empty($this->options['pid_file'])){
+			$this->options['pid_file'] = $runtimePath . 'worker' . DIRECTORY_SEPARATOR . $this->options['name'] . '.pid';
+		}
+
+		// 目录不存在则自动创建
+		$pid_dir = dirname($this->options['pid_file']);
+		if (!is_dir($pid_dir)){
+			mkdir($pid_dir, 0755, true);
+		}
+		// 指定pid文件路径
+		Worker::$pidFile = $this->options['pid_file'];
+
+        // 日志文件路径
+		if(empty($this->options['log_file'])){
+			$this->options['log_file'] = $runtimePath . 'worker' . DIRECTORY_SEPARATOR . $this->options['name'] . '.log';
+		}
+		// 目录不存在则自动创建
+		$log_dir = dirname($this->options['log_file']);
+		if (!is_dir($log_dir)){
+			mkdir($log_dir, 0755, true);
+		}
+		// 指定日志文件路径
+		Worker::$logFile = $this->options['log_file'];
+
+        // 如果指定以守护进程方式运行
+        if (true === $this->options['daemonize']) {
+            Worker::$daemonize = true;
+        }
+
         // 实例化gateway进程
         $gateway = new GatewayWorker($this->options['protocol'] . $this->options['listen'] . ':' . $this->options['port']);
         // gateway名称，status方便查看
         $gateway->name = $this->options['name'];
-        if(empty($gateway->name)){
-            $gateway->name = 'think-socket-gateway';
-        }
-        // 设置runtime路径
-        App::setRuntimePath(App::getRuntimePath() . $gateway->name . DIRECTORY_SEPARATOR);
         // gateway进程数
         $gateway->count = $this->options['count'];
         // 本机ip，分布式部署时使用内网ip
@@ -121,35 +219,7 @@ class Gateway
         $gateway->pingNotResponseLimit = $this->options['ping_not_response_limit'];
         // 心跳数据
         $gateway->pingData = $this->options['ping_data'];
-        // 如果存在Gateway进程启动后的回调函数
-        if(!empty($this->options['on_worker_start'])){
-            $gateway->onWorkerStart = $this->options['on_worker_start'];
-        }
-        // 如果存在Gateway进程关闭的回调函数
-        if(!empty($this->options['on_worker_stop'])){
-            $gateway->onWorkerStop = $this->options['on_worker_stop'];
-        }
-        // 如果存在客户端连接上来时触发的回调函数
-        if(!empty($this->options['on_connect'])){
-            $gateway->onConnect = $this->options['on_connect'];
-        }
-        // 如果存在客户端连接关闭时触发的回调函数
-        if(!empty($this->options['on_close'])){
-            $gateway->onClose = $this->options['on_close'];
-        }
-        // 如果指定以守护进程方式运行
-        if (true === $this->options['daemonize']) {
-            Worker::$daemonize = true;
-        }
-	}
-
-    /**
-     * 启动
-     * @access public
-	 * @return void
-     */
-	public function start()
-	{
+        
         // 启动
 		Worker::runAll();
 	}
